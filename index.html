@@ -3,11 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exemple de code pour les M2 GSI 2023-24</title>
-    <script src="http://d3js.org/d3.v7.min.js"></script>
+    <title>Exemple de code pour les M2 GSI promotion 23-24</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        h3 {
+            color:red;
+        }
+        h4 {
+            margin-left:30px;
+        }
+        button {
+            margin-left:3px;
+        }
+    </style>
 </head>
 <body>
-   <h1>On apprend</h1>
-   
+    <h1>Exemple de code pour les M2 GSI promotion 23-24</h1>
+    <h2>Groupes projets</h2>
+    <div id="listeProjet"></div>
+    <script>
+        d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vSI12b8bU2rzFanGSvLxn6yzYgdF6LAEUOdtlakSDEXhTrd7OkvTSry-0FSn2404dku3MK6Kjb0Wo5U/pub?gid=671736105&single=true&output=csv")
+            .then(rs=>{
+                console.log(rs);
+                let lp = d3.select('#listeProjet');
+                //récupèrer les groupe et les participants
+                let gp=[], divGroupe, divParticipants;
+                rs.forEach(r => {
+                    let groupe = {'nom':r['Nom du groupe'], 'url':r['Adresse du repository GitHub'],'participants':[]};
+                    for (let index = 1; index <= 4; index++) {
+                        if(r['Nom du participant '+index]){
+                            let p = {'nom':r['Nom du participant '+index],
+                                    url:"https://github.com/"+r['Compte GitHub du participant '+index],
+                                    urlGithubGroupe : r['Adresse du repository GitHub'],
+                                    id:r['ownerId '+index]
+                                };                        
+                            groupe.participants.push(p);
+                        }
+                    }
+                    gp.push(groupe);
+                });
+                //création des groupes
+                divGroupe = lp.selectAll('div').data(gp).enter().append('div');
+                divGroupe.append('a').attr('href',d=>d.url).attr('target','_blanck').append('h3').text(d=>d.nom);
+                //création des participants du groupe
+                divParticipants = divGroupe.selectAll('div').data(d=>d.participants).enter().append('div')
+                    .attr('id',d=>'etu'+d.id);
+                //lien vers le github du participant
+                divParticipants.append('a')
+                    .attr('href',d=>d.url).attr('target','_blanck').append('h4').text(d=>d.nom);
+                //lien vers le fichier json omk des arguments du participants
+                divParticipants.append('a')
+                    .attr('href',d=>d.urlGithubGroupe+'/blob/main/data/items'+d.id+'.json').attr('target','_blanck').append('h5').text('json des arguments');
+                //création d'un bouton pour afficher les arguments
+                divParticipants.append('button')
+                    .text('Voir les arguments')
+                    .on('click',showArguments);
+            })
+        function showArguments(e,d){
+            console.log(e,d);
+            //supprimer les anciennes informations
+            d3.select('#etu'+d.id).select('ul').remove();
+            //récupérer d'omk la lsite des argument d'un participant
+            d3.json("https://argument.generateur.art/api/items?owner_id="+d.id)
+            .then(rs=>{
+                console.log(rs);
+                //ajouter la liste des argument du participant
+                let ulEtuArgu = d3.select('#etu'+d.id).append('ul'),
+                //ajoute chaque argument
+                arguments = ulEtuArgu.selectAll('li').data(rs).enter().append('li')
+                    .attr('id',d=>'argu'+d['o:id'])
+                //Ajoute le lien vers l'argument dans omk
+                arguments.append('a')
+                    .attr('href',d=>'https://argument.generateur.art/admin/item/'+d['o:id'])
+                    .attr('target','_blanck')
+                    .text(d=>d["dcterms:title"][0]["@value"]);
+                arguments.append('button')
+                    .text('Générer des arguments')
+                    .on('click',genereArgument);
+
+            })
+        }
+        function genereArgument(e,arg){
+            let argu = d3.select('#argu'+arg['o:id']);
+            argu.select('div').remove();            
+            let divTxtArgu = argu.append('div');
+            divTxtArgu.selectAll('span').data(arg["argu:generateur"]).enter().append('span')
+                .attr('id',(g,i)=>{
+                    g.idSpan = 'span'+arg['o:id']+'_'+i;
+                    return g.idSpan;
+                })
+                .text((g,i)=>{
+                    if(i>0){
+                        if(g.type=='literal')return g['@value'];
+                        if(g.type=='resource'){
+                            getAleaDescription(g);
+                        }
+                    }
+                })
+
+        }
+        function getAleaDescription(d){
+            d3.json(d['@id'])
+                .then(rs=>{
+                    //récupère les description des la ressource
+                    let listeDesc = rs['dcterms:description'],
+                    //choisi une description dans la liste
+                    choixDesc = listeDesc[d3.randomInt(listeDesc.length-1)()];
+                    //affiche le description choisie
+                    d3.select('#'+d.idSpan).text(choixDesc['@value']);
+                });
+        } 
+    </script>
 </body>
 </html>
